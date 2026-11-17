@@ -1,0 +1,22 @@
+[project]
+name = "bigid-assignment"
+version = "0.1.0"
+description = "Tiny Flask web app that return the client's public orignating IP address"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.1,<4",
+    "gunicorn>=23,<24",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath=["."]
+testpaths=["tests"]
