@@ -7,17 +7,6 @@ image:
 
 imagePullSecrets: []
 
-nameOverride: ""
-fullnameOverride: ""
-
-serviceAccount:
-  create: true
-  automount: false
-  name: ""
-
-podAnnotations: {}
-podLabels: {}
-
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 10001
@@ -42,7 +31,6 @@ service:
 ingress:
   enabled: false
   className: ""
-  annotations: {}
   hosts:
     - host: whoami.local
       paths:
@@ -92,7 +80,3 @@ autoscaling:
 podDisruptionBudget:
   enabled: false
   minAvailable: 1
-
-nodeSelector: {}
-tolerations: []
-affinity: {}

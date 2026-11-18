@@ -2,17 +2,14 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "example.fullname" . }}
+  name: {{ include "bigid-assignment.fullname" . }}
   labels:
-    {{- include "example.labels" . | nindent 4 }}
+    {{- include "bigid-assignment.labels" . | nindent 4 }}
 spec:
   {{- with .Values.podDisruptionBudget.minAvailable }}
   minAvailable: {{ . }}
   {{- end }}
-  {{- with .Values.podDisruptionBudget.maxUnavailable }}
-  maxUnavailable: {{ . }}
-  {{- end }}
   selector:
     matchLabels:
-      {{- include "example.selectorLabels" . | nindent 6 }}
+      {{- include "bigid-assignment.selectorLabels" . | nindent 6 }}
 {{- end }}
