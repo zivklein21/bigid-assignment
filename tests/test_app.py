@@ -36,8 +36,9 @@ def test_uses_forwarded_header_behind_one_proxy():
 @pytest.mark.parametrize("proxies,expected", [(1, "198.51.100.20"), (2, "192.0.2.1")])
 def test_spoofed_entries_are_ignored(proxies, expected):
     # Client injected "6.6.6.6"; trusted proxies appended the real hops on the right.
-    resp = get(create_app(proxies), remote="10.0.0.5",
-               xff="6.6.6.6, 192.0.2.1, 198.51.100.20")
+    resp = get(
+        create_app(proxies), remote="10.0.0.5", xff="6.6.6.6, 192.0.2.1, 198.51.100.20"
+    )
     assert resp.text == f"{expected}\n"
 
 
@@ -50,9 +51,14 @@ BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.
 
 
 def test_browser_gets_html_page():
-    resp = create_app(0).test_client().get(
-        "/", headers={"Accept": BROWSER_ACCEPT},
-        environ_base={"REMOTE_ADDR": "203.0.113.7"},
+    resp = (
+        create_app(0)
+        .test_client()
+        .get(
+            "/",
+            headers={"Accept": BROWSER_ACCEPT},
+            environ_base={"REMOTE_ADDR": "203.0.113.7"},
+        )
     )
     assert resp.mimetype == "text/html"
     assert "203.0.113.7" in resp.text
@@ -60,8 +66,12 @@ def test_browser_gets_html_page():
 
 
 def test_curl_default_accept_gets_plain_text():
-    resp = create_app(0).test_client().get(
-        "/", headers={"Accept": "*/*"}, environ_base={"REMOTE_ADDR": "203.0.113.7"}
+    resp = (
+        create_app(0)
+        .test_client()
+        .get(
+            "/", headers={"Accept": "*/*"}, environ_base={"REMOTE_ADDR": "203.0.113.7"}
+        )
     )
     assert resp.text == "203.0.113.7\n"
 
@@ -81,23 +91,30 @@ def test_static_assets_served():
 def test_health():
     assert get(create_app(0), "/health").get_json() == {"status": "ok"}
 
+
 def test_ready_ok():
     resp = get(create_app(0), "/ready")
     assert resp.status_code == 200
-    assert resp.get_json() == {"status":"ready","checks":{"templates":"ok","static":"ok"}}
+    assert resp.get_json() == {
+        "status": "ready",
+        "checks": {"template": "ok", "static": "ok"},
+    }
+
 
 def test_ready_fails_when_templates_missing(tmp_path):
-    resp = get(craete_app(0, template_folder=str(tmp_path)), "/ready")
-    assert resp.status_code == 200
+    resp = get(create_app(0, template_folder=str(tmp_path)), "/ready")
+    assert resp.status_code == 503
     body = resp.get_json()
     assert body["status"] == "not ready"
-    assert body["checks"]["templates"].startswith("fail")
+    assert body["checks"]["template"].startswith("fail")
     assert body["checks"]["static"] == "ok"
 
+
 def test_ready_fails_when_static_missing(tmp_path):
-    resp = get(create_app(0,static_folder=str(tmp_path)), "/ready")
+    resp = get(create_app(0, static_folder=str(tmp_path)), "/ready")
     assert resp.status_code == 503
     assert resp.get_json()["checks"]["static"] == "fail: missing style.css, app.js"
+
 
 @pytest.mark.parametrize("path", ["/health", "/ready"])
 def test_probes_not_cached(path):
