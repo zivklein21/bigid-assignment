@@ -91,6 +91,7 @@ def test_static_assets_served():
 def test_health():
     assert get(create_app(0), "/health").get_json() == {"status": "ok"}
 
+
 def test_ready_ok():
     resp = get(create_app(0), "/ready")
     assert resp.status_code == 200
@@ -98,6 +99,7 @@ def test_ready_ok():
         "status": "ready",
         "checks": {"templates": "ok", "static": "ok"},
     }
+
 
 def test_ready_fails_when_templates_missing(tmp_path):
     resp = get(create_app(0, template_folder=str(tmp_path)), "/ready")
@@ -107,10 +109,12 @@ def test_ready_fails_when_templates_missing(tmp_path):
     assert body["checks"]["templates"].startswith("fail")
     assert body["checks"]["static"] == "ok"
 
+
 def test_ready_fails_when_static_missing(tmp_path):
     resp = get(create_app(0, static_folder=str(tmp_path)), "/ready")
     assert resp.status_code == 503
     assert resp.get_json()["checks"]["static"] == "fail: missing style.css, app.js"
+
 
 @pytest.mark.parametrize("path", ["/health", "/ready"])
 def test_probes_not_cached(path):

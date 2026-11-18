@@ -1,4 +1,5 @@
 """Tiny web app that returns the client's public originating IP address."""
+
 import os
 from ipaddress import ip_address
 from pathlib import Path
@@ -15,6 +16,7 @@ def _prefers_html() -> bool:
         and request.accept_mimetypes[best] > request.accept_mimetypes["text/plain"]
     )
 
+
 def rediness_checks(app: Flask) -> dict[str, str]:
     """Check what a real request needs. Returns "ok" or "fail: <reason>" per check."""
     checks = {}
@@ -30,9 +32,9 @@ def rediness_checks(app: Flask) -> dict[str, str]:
     return checks
 
 def create_app(
-    trusted_proxies: int | None = None, 
-    template_folder: str = "templates", 
-    static_folder: str = "static"
+    trusted_proxies: int | None = None,
+    template_folder: str = "templates",
+    static_folder: str = "static",
 ) -> Flask:
     """Build the app.
 
