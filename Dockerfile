@@ -1,11 +1,39 @@
-FROM python:3.13-slim
+FROM python:3.13-slim AS builder
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends binutils \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install uv
+
+ WORKDIR /app
+
+ENV UV_PYTHON_DOWNLOADS=0 \
+    UV_CACHE_DIR=/root/.cache/uvm \
+    UV_SYSTEM_PYTHON=1 \
+    UV_SKIP_WHEEL_FILENAME_CHECK=1 \
+    UV_LINK_MODE=copy
+
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    uv sync --no-install-project --group build --no-dev --frozen
+
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    uv run pyinstaller --onefile app.py \
+        --name app \
+        --add-data "templates:templates" \
+        --add-data "static:static" \
+        --distpath ./ \
+        --clean
+
+FROM python:3.13-slim AS runtime
+
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py .
-COPY templates/ templates/
-COPY static/ static/
-ENV PORT=8080 TRUSTED_PROXIES=0
+
+COPY --from=builder /app/app /app/app
+
+RUN chmod +x /app/app
+
 EXPOSE 8080
-USER nobody
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 app:app"]
+
+CMD ["/app/app"]
