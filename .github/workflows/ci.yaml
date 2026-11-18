@@ -53,6 +53,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          push: true
           context: .
           file: Dockerfile
           push: ${{ github.event_name == 'push' }}
