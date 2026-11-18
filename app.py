@@ -2,9 +2,9 @@
 import os
 from ipaddress import ip_address
 from pathlib import Path
-from jinja2 import TemplateError
 
 from flask import Flask, jsonify, render_template, request
+from jinja2 import TemplateError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 
