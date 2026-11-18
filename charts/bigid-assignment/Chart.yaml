@@ -1,0 +1,6 @@
+apiVersion: v2
+name: bigid-assignment
+description: Returns the client's public originating IP address
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
