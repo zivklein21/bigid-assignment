@@ -28,6 +28,10 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 
 FROM python:3.13-slim AS runtime
 
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && rm -rf /var/lib/apt/lists/*
+ 
 WORKDIR /app
 
 COPY --from=builder /app/app /app/app
