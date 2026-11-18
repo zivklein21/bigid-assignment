@@ -2,6 +2,7 @@
 import os
 from ipaddress import ip_address
 from pathlib import Path
+from jinja2 import TemplateError
 
 from flask import Flask, jsonify, render_template, request
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -17,7 +18,7 @@ def rediness_checks(app: Flask) -> dict[str, str]:
     try:
         app.jinja_env.get_template("index.html")
         checks["template"] = "ok"
-    except Exception as e:
+    except TemplateError as e:
         checks["template"] = f"fail: {e.__class__.__name__}"
 
     static = Path(app.static_folder or "")
