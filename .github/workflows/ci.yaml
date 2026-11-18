@@ -31,8 +31,8 @@ jobs:
     needs: [lint, tests]
     runs-on: ubuntu-latest
     permissions:
-      content: read
-      package: write
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
