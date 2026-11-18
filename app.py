@@ -10,7 +10,10 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 def _prefers_html() -> bool:
     best = request.accept_mimetypes.best_match(["text/plain", "text/html"])
-    return best == "text/html" and request.accept_mimetypes[best] > request.accept_mimetypes["text/plain"]
+    return (
+        best == "text/html" 
+        and request.accept_mimetypes[best] > request.accept_mimetypes["text/plain"]
+    )
 
 def rediness_checks(app: Flask) -> dict[str, str]:
     """Check what a real request needs. Returns "ok" or "fail: <reason>" per check."""
@@ -26,7 +29,11 @@ def rediness_checks(app: Flask) -> dict[str, str]:
     checks["static"] = f"fail: missing {', '.join(missing)}" if missing else "ok"
     return checks
 
-def create_app(trusted_proxies: int | None = None, template_folder: str = "templates", static_folder: str = "static") -> Flask:
+def create_app(
+        trusted_proxies: int | None = None, 
+        template_folder: str = "templates", 
+        static_folder: str = "static"
+) -> Flask:
     """Build the app.
 
     trusted_proxies: number of reverse proxies / load balancers in front of
@@ -54,7 +61,7 @@ def create_app(trusted_proxies: int | None = None, template_folder: str = "templ
         return f"{ip}\n", 200, {"Content-Type": "text/plain; charset=utf-8"}
 
     checks = rediness_checks(app)
-    is_ready = all(v == "ok" for v in checks.values())   
+    is_ready = all(v == "ok" for v in checks.values())
 
     @app.get("/health")
     def health():
@@ -62,7 +69,7 @@ def create_app(trusted_proxies: int | None = None, template_folder: str = "templ
 
     @app.get("/ready")
     def ready():
-        body = {"status":"ready" if is_ready else "not ready", "checks" : checks}
+        body = {"status": "ready" if is_ready else "not ready", "checks": checks}
         return jsonify(body), 200 if is_ready else 503, {"Cache-Control": "no-store"}
 
     return app
