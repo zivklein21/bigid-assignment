@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>What's My IP</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="card">
+    <p class="label">Your public IP address</p>
+    <div class="ip-row">
+      <code id="ip">{{ ip }}</code>
+      <button id="copy" type="button" aria-label="Copy IP address">Copy</button>
+    </div>
+    <p class="meta">IPv{{ version }}</p>
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
