@@ -1,4 +1,4 @@
-replicaCount: 2
+replicaCount: r
 
 image:
   repository: ghcr.io/zivklein21/bigid-assignment
