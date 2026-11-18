@@ -11,7 +11,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 def _prefers_html() -> bool:
     best = request.accept_mimetypes.best_match(["text/plain", "text/html"])
     return (
-        best == "text/html" 
+        best == "text/html"
         and request.accept_mimetypes[best] > request.accept_mimetypes["text/plain"]
     )
 
@@ -30,9 +30,9 @@ def rediness_checks(app: Flask) -> dict[str, str]:
     return checks
 
 def create_app(
-        trusted_proxies: int | None = None, 
-        template_folder: str = "templates", 
-        static_folder: str = "static"
+    trusted_proxies: int | None = None, 
+    template_folder: str = "templates", 
+    static_folder: str = "static"
 ) -> Flask:
     """Build the app.
 

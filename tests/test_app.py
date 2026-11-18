@@ -55,7 +55,7 @@ def test_browser_gets_html_page():
         create_app(0)
         .test_client()
         .get(
-            "/", 
+            "/",
             headers={"Accept": BROWSER_ACCEPT},
             environ_base={"REMOTE_ADDR": "203.0.113.7"},
         )
@@ -70,9 +70,7 @@ def test_curl_default_accept_gets_plain_text():
         create_app(0)
         .test_client()
         .get(
-            "/", 
-            headers={"Accept": "*/*"}, 
-            environ_base={"REMOTE_ADDR": "203.0.113.7"}
+            "/", headers={"Accept": "*/*"}, environ_base={"REMOTE_ADDR": "203.0.113.7"}
         )
     )
     assert resp.text == "203.0.113.7\n"
@@ -97,8 +95,8 @@ def test_ready_ok():
     resp = get(create_app(0), "/ready")
     assert resp.status_code == 200
     assert resp.get_json() == {
-        "status":"ready",
-        "checks":{"templates":"ok","static":"ok"}
+        "status": "ready",
+        "checks": {"templates": "ok", "static": "ok"},
     }
 
 def test_ready_fails_when_templates_missing(tmp_path):
