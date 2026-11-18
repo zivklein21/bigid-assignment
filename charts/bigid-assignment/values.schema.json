@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "bigid-assignment values",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "global": { "type": "object" },
+
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of pods (ignored when autoscaling.enabled)"
+    },
+
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "description": "Empty = Chart appVersion" },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string" } }
+      }
+    },
+
+    "podSecurityContext": { "type": "object" },
+    "securityContext": { "type": "object" },
+
+    "containerPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["host", "paths"],
+            "properties": {
+              "host": { "type": "string" },
+              "paths": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "pathType"],
+                  "properties": {
+                    "path": { "type": "string", "pattern": "^/" },
+                    "pathType": { "enum": ["Prefix", "Exact", "ImplementationSpecific"] }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "hosts": { "type": "array", "items": { "type": "string" } },
+              "secretName": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "trustedProxies": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of reverse proxies in front of the app (TRUSTED_PROXIES env)"
+        }
+      }
+    },
+
+    "existingSecret": { "type": "string", "description": "Secret to load as envFrom; empty = none" },
+    "env": { "type": "array", "items": { "type": "object" } },
+    "envFrom": { "type": "array", "items": { "type": "object" } },
+
+    "resources": { "type": "object" },
+
+    "livenessProbe": { "type": "object" },
+    "readinessProbe": { "type": "object" },
+    "startupProbe": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+
+    "autoscaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    },
+
+    "podDisruptionBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minAvailable": {
+          "anyOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]+%$" }
+          ]
+        }
+      }
+    }
+  }
+}
