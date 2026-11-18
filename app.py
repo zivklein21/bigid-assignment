@@ -31,6 +31,7 @@ def rediness_checks(app: Flask) -> dict[str, str]:
     checks["static"] = f"fail: missing {', '.join(missing)}" if missing else "ok"
     return checks
 
+
 def create_app(
     trusted_proxies: int | None = None,
     template_folder: str = "templates",
