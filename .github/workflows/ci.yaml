@@ -62,7 +62,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Scan image with trivy
-        uses: aquasecurity/trivy-action@v2
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ghcr.io/${{ github.repository }}:${{ steps.vars.outputs.sha }}
           format: table
