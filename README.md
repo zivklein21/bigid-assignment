@@ -1,6 +1,6 @@
 # bigid-assignment
 
-[![CI](https://github.com/zivklein21/bigid-assignment/actions/workflows/ci.yml/badge.svg)](https://github.com/zivklein21/bigid-assignment/actions/workflows/ci.yml)
+[![CI](https://github.com/zivklein21/bigid-assignment/actions/workflows/ci.yaml/badge.svg)](https://github.com/zivklein21/bigid-assignment/actions/workflows/ci.yaml)
 
 A tiny Flask web app that returns the client's public originating IP address,
 correctly and spoof-safely, even when running behind load balancers and reverse proxies.
@@ -146,6 +146,30 @@ helm install whoami ./charts/bigid-assignment
 kubectl port-forward svc/whoami-bigid-assignment 8080:80
 curl localhost:8080/
 ```
+
+## Published image
+
+CI builds the image on every pull request and on every push to `main`.
+Only pushes to `main` publish it, to GitHub Container Registry:
+
+```
+ghcr.io/zivklein21/bigid-assignment:<commit-sha>
+```
+
+The tag is the first 10 characters of the commit SHA that was built, so every image
+maps to exactly one commit. There is no `latest` tag: deploy a specific SHA.
+
+```bash
+# Find the SHA of a commit on main
+git log -1 --format=%H | cut -c1-10
+
+# Pull and run that image
+docker pull ghcr.io/zivklein21/bigid-assignment:<commit-sha>
+docker run --rm -p 8080:8080 ghcr.io/zivklein21/bigid-assignment:<commit-sha>
+```
+
+All published tags are listed on the repository's
+[Packages page](https://github.com/zivklein21/bigid-assignment/pkgs/container/bigid-assignment).
 
 ## Configuration
 
