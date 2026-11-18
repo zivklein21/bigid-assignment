@@ -67,7 +67,7 @@ Both probes send `Cache-Control: no-store`, so no proxy caches a probe result.
 ├── tests/test_app.py      # pytest suite
 ├── charts/                # Helm chart for Kubernetes deployment
 ├── .github/workflows/     # CI: tests → build image
-├── Dockerfile             # Production image (gunicorn, non-root)
+├── Dockerfile             # Multi-stage build: uv + PyInstaller → single binary
 ├── pyproject.toml         # Dependencies: prod + dev group (uv)
 └── uv.lock                # Locked versions
 ```
@@ -86,11 +86,56 @@ uv run python app.py       # dev server on http://localhost:8080
 
 ### 2. With Docker
 
+The Dockerfile is a multi-stage build. The `builder` stage uses uv to install the
+dependencies, then PyInstaller bundles `app.py`, `templates/` and `static/` into
+one executable. The `runtime` stage contains only that executable.
+
+**Build the image**
+
 ```bash
 docker build -t bigid-assignment .
-docker run --rm -p 8080:8080 bigid-assignment
-curl localhost:8080/
 ```
+
+**Run in the foreground** (Ctrl+C stops it; `--rm` removes the container afterwards)
+
+```bash
+docker run --rm -p 8080:8080 bigid-assignment
+```
+
+**Run in the background (detached)**
+
+```bash
+docker run -d --name bigid -p 8080:8080 bigid-assignment
+
+docker ps --filter name=bigid    # STATUS should say "Up"
+docker logs -f bigid             # follow the app logs
+```
+
+**Check that it works**
+
+```bash
+curl localhost:8080/                 # your IP as plain text
+curl "localhost:8080/?format=json"   # {"ip":"..."}
+curl localhost:8080/health           # {"status":"ok"}
+curl -i localhost:8080/ready         # 200 when the templates and static files are present
+```
+
+**Configuration.** Pass settings as environment variables (see
+[Configuration](#configuration)). If you change `PORT`, change the container
+side of `-p` to match:
+
+```bash
+docker run -d --name bigid -p 9000:9000 -e PORT=9000 -e TRUSTED_PROXIES=1 bigid-assignment
+```
+
+**Stop and clean up**
+
+```bash
+docker stop bigid && docker rm bigid
+```
+
+If a detached container exits immediately, run `docker logs bigid` to see why.
+Also make sure you ran the `bigid-assignment` tag and not another image ID.
 
 ### 3. On Kubernetes (kind + Helm)
 
