@@ -73,3 +73,11 @@ jobs:
       - name: Push image
         if: github.event_name == 'push'
         run: docker push ghcr.io/${{github.repository}}:${{ steps.vars.outputs.sha }}
+
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Helm lint
+        run: helm lint --strict charts/bigid-assignment
