@@ -97,16 +97,16 @@ def test_ready_ok():
     assert resp.status_code == 200
     assert resp.get_json() == {
         "status": "ready",
-        "checks": {"templates": "ok", "static": "ok"},
+        "checks": {"template": "ok", "static": "ok"},
     }
 
 
 def test_ready_fails_when_templates_missing(tmp_path):
     resp = get(create_app(0, template_folder=str(tmp_path)), "/ready")
-    assert resp.status_code == 200
+    assert resp.status_code == 503
     body = resp.get_json()
     assert body["status"] == "not ready"
-    assert body["checks"]["templates"].startswith("fail")
+    assert body["checks"]["template"].startswith("fail")
     assert body["checks"]["static"] == "ok"
 
 
