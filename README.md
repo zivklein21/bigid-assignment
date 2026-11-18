@@ -141,11 +141,19 @@ Also make sure you ran the `bigid-assignment` tag and not another image ID.
 
 ```bash
 kind create cluster
+docker build -t bigid-assignment .
 kind load docker-image bigid-assignment
-helm install whoami ./charts/bigid-assignment
+
+# Use the locally built image instead of the GHCR default
+helm install whoami ./charts/bigid-assignment \
+  --set image.repository=bigid-assignment,image.tag=latest,image.pullPolicy=Never
+
+kubectl get pods -l app.kubernetes.io/instance=whoami   # wait for 1/1 Ready
 kubectl port-forward svc/whoami-bigid-assignment 8080:80
 curl localhost:8080/
 ```
+
+See [Deploying with Helm](#deploying-with-helm) for configuration and secrets.
 
 ## Published image
 
@@ -177,6 +185,143 @@ All published tags are listed on the repository's
 |-------------------|---------|-------------------------------------------------|
 | `PORT`            | `8080`  | Port to listen on                               |
 | `TRUSTED_PROXIES` | `0`     | Number of reverse proxies in front of the app   |
+
+## Deploying with Helm
+
+The chart lives in [`charts/bigid-assignment`](charts/bigid-assignment) and passes
+`helm lint --strict`.
+
+```bash
+# Deploy a published image (always pin a commit SHA; there is no `latest`)
+helm install whoami ./charts/bigid-assignment --set image.tag=<commit-sha>
+
+# Upgrade with your own overrides
+helm upgrade whoami ./charts/bigid-assignment -f my-values.yaml
+```
+
+### Main values
+
+| Key                                   | Default                               | Description                                                   |
+|---------------------------------------|---------------------------------------|---------------------------------------------------------------|
+| `image.repository`                    | `ghcr.io/zivklein21/bigid-assignment` | Image to run                                                  |
+| `image.tag`                           | `""` (→ `appVersion`)                 | Commit SHA to deploy                                          |
+| `replicaCount`                        | `2`                                   | Ignored when `autoscaling.enabled=true`                       |
+| `config.trustedProxies`               | `0`                                   | → `TRUSTED_PROXIES`. Use `1` behind ingress-nginx / an ALB    |
+| `resources`                           | req `50m`/`64Mi`, lim `200m`/`128Mi`  | Container requests and limits                                 |
+| `livenessProbe`                       | `GET /health` every 10s               | Restart the container if it hangs                             |
+| `readinessProbe`                      | `GET /ready` every 5s                 | Remove the pod from the Service while it returns 503          |
+| `startupProbe.enabled`                | `true`                                | `GET /health`, up to ~60s (30 × 2s) to start                  |
+| `existingSecret`                      | `""`                                  | Secret whose keys become env vars (see [Secrets](#secrets))   |
+| `env` / `envFrom`                     | `[]`                                  | Extra env vars / sources                                      |
+| `ingress.enabled`                     | `false`                               | Create an Ingress                                             |
+| `autoscaling.enabled`                 | `false`                               | Create an HPA (2–5 replicas, 80% CPU)                         |
+| `podDisruptionBudget.enabled`         | `false`                               | Create a PDB (`minAvailable: 1`)                              |
+
+### Probes
+
+- **Liveness:** `/health`. It has no dependencies, so it fails only if the process is stuck.
+- **Readiness:** `/ready`. It returns 503 when the templates or static files are missing.
+- **Startup:** `/health`. The PyInstaller binary unpacks itself into `/tmp` on boot, so the
+  startup probe holds off liveness checks until the app is up. Set
+  `startupProbe.enabled=false` to turn it off.
+
+Every probe field can be overridden. Anything you set replaces the default:
+
+```yaml
+# my-values.yaml
+readinessProbe:
+  httpGet: { path: /ready, port: http }
+  periodSeconds: 10
+  failureThreshold: 6
+startupProbe:
+  enabled: true
+  httpGet: { path: /health, port: http }
+  periodSeconds: 5
+  failureThreshold: 24
+```
+
+### Security defaults
+
+The pod runs as non-root UID `10001` with a read-only root filesystem (an `emptyDir` is
+mounted at `/tmp` for the PyInstaller unpack). All Linux capabilities are dropped,
+privilege escalation is disabled, and the `RuntimeDefault` seccomp profile is used. The
+ServiceAccount token is not mounted, since the app doesn't call the Kubernetes API.
+
+### Secrets
+
+The app needs no secrets today. This section describes the supported way to add them.
+
+**The rule:** the chart never creates a Secret, and `values.yaml` has no field for secret
+values. Anything passed through values ends up in git, in shell history (`--set`) and in
+the Helm release object (`sh.helm.release.v1.*`), which anyone who can read Secrets in the
+namespace can decode. Secrets are created **outside** the chart and referenced **by name**.
+
+**Using a Secret in the chart.** There are two ways:
+
+```yaml
+# 1. Load every key of the Secret as an env var (envFrom.secretRef)
+existingSecret: whoami-secrets
+
+# 2. Pick individual keys
+env:
+  - name: API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: whoami-secrets
+        key: api-key
+```
+
+**Creating the Secret.** Pick the method that matches the environment:
+
+1. **Plain Kubernetes Secret (local / dev).** Create it imperatively and never commit it:
+
+   ```bash
+   kubectl create secret generic whoami-secrets \
+     --from-literal=API_KEY=changeme
+   # or from a local, git-ignored file
+   kubectl create secret generic whoami-secrets --from-env-file=.env
+   ```
+
+2. **Sealed Secrets (GitOps).** Encrypt the Secret with the cluster's public key. The
+   resulting `SealedSecret` is safe to commit, and the
+   [sealed-secrets](https://github.com/bitnami-labs/sealed-secrets) controller decrypts it
+   in-cluster into `whoami-secrets`:
+
+   ```bash
+   kubectl create secret generic whoami-secrets \
+     --from-literal=API_KEY=changeme --dry-run=client -o yaml \
+     | kubeseal -o yaml > sealed-secret.yaml
+   kubectl apply -f sealed-secret.yaml
+   ```
+
+3. **External Secrets Operator (cloud secret manager).** The secret stays in Vault, AWS
+   Secrets Manager, GCP Secret Manager or similar. The
+   [External Secrets Operator](https://external-secrets.io) syncs it into `whoami-secrets`
+   and keeps it up to date when it rotates:
+
+   ```yaml
+   apiVersion: external-secrets.io/v1
+   kind: ExternalSecret
+   metadata:
+     name: whoami-secrets
+   spec:
+     refreshInterval: 1h
+     secretStoreRef:
+       kind: ClusterSecretStore
+       name: aws-secrets-manager      # defined once by the platform team
+     target:
+       name: whoami-secrets           # the Secret the chart references
+     data:
+       - secretKey: API_KEY
+         remoteRef:
+           key: prod/whoami
+           property: api-key
+   ```
+
+In all three cases the chart side is the same: `existingSecret: whoami-secrets`.
+
+Non-secret settings (`TRUSTED_PROXIES`, `PORT`) are plain configuration. Set them through
+`config.*` or `env`, not a Secret.
 
 ## Design decision: identifying the client IP
 
