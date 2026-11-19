@@ -134,7 +134,7 @@ jobs:
             curl -fs localhost:8080/health > /dev/null && break
             sleep 1
           done
-          bash scripts/smoke-test.sh http://localhost:8080
+          bash scripts/smoke-test.sh http://localhost:9999
 
       - name: Debug on failure
         if: failure()
@@ -160,3 +160,61 @@ jobs:
             -f context="deploy/staging" \
             -f description="Staging deploy + smoke test: $STATE" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  ai-diagosis:
+    needs: [lint, tests, helm-lint, build, deploy-staging]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    env:  
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Collect failed job logs
+        run: |
+          gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" --paginate \
+            --jq '.jobs[] | select(.conclusion == "failure") | "\(.id) \(.name)"' | 
+          while read -r id name; do
+            echo "=== FAILED JOB: $name ==="
+            gh api "repos/$REPO/actions/jobs/$id/logs" \
+              | sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+z //' \
+              | tail -n 300
+          done < failed.log
+          wc -l failed.log
+
+      - name: Ask Claude for a diagnosis
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "No ANTHROPIC_API_KEY available; skipping" > diagnosis.md
+          else
+            uv run --no-project --with anthropic python scripts/ai_diagnosis.py failed.log > diagnosis.md
+          fi
+          cat diagnosis.md
+
+      - name: Post diagnosis
+        run: |
+          {
+            echo "## AI diagnosis of failed workflow"
+            echo
+            cat diagnosis.md
+            echo
+            echo "[View run](${{ github.server_url }}/$REPO/actions/runs/$RUN_ID) · AI-generated: verify before acting."
+          } > comment.md
+
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{github.event_name }}" == "pull_request" ]; then
+            gh pr comment "${{ github.event.pull_request.number }}" --repo "$RPEO" --body-file comment.md
+          else
+            gh api "repos/$REPO/commits/${{ github.sha }}/comments" -F body=@comment.md
+          fi
+
