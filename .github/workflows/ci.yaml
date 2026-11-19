@@ -114,5 +114,13 @@ jobs:
           helm upgrade --install whoami charts/bigid-assignment \
             --namespace staging \
             -f charts/bigid-assignment/values-staging.yaml \
-            --set-string image.tag=${{ needs.build.outputs.sha }} \
+            --set-string image.tag=${{ needs.buildאיק.outputs.sha }} \
             --wait --timeout 3m
+
+      - name: Curl the app
+        run: |
+          kubectl -n staging port-forward svc/whoami-bigid-assignment 8080:80 &
+          sleep 3
+          curl -fsS localhost:8080/
+          curl -fsS localhost:8080/health
+          curl -fsS localhost:8080/ready
