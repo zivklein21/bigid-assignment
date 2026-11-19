@@ -217,4 +217,3 @@ jobs:
           else
             gh api "repos/$REPO/commits/${{ github.sha }}/comments" -F body=@comment.md
           fi
-
