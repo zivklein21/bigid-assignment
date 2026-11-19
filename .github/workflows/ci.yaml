@@ -134,7 +134,7 @@ jobs:
             curl -fs localhost:8080/health > /dev/null && break
             sleep 1
           done
-          bash scripts/smoke-test.sh http://localhost:9999
+          bash scripts/smoke-test.sh http://localhost:8080
 
       - name: Debug on failure
         if: failure()
