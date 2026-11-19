@@ -157,6 +157,6 @@ jobs:
         run: |
           gh api repos/${{ github.repository }}/statuses/${{ github.sha }} \
             -f state="$STATE" \
-            -f context="deploy/staging"
+            -f context="deploy/staging" \
             -f description="Staging deploy + smoke test: $STATE" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
