@@ -2,6 +2,7 @@
 
 Usage: ai_diagnose.py <log-file>   (prints markdown to stdout)
 """
+
 import sys
 
 import anthropic
