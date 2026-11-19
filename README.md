@@ -234,6 +234,8 @@ Staging is **ephemeral**: the kind cluster exists only for the length of the job
 deploy to a long-lived cluster, replace the kind step with a kubeconfig stored as a
 secret; the Helm commands stay the same.
 
+> [!NOTE]
+> > Staging is an ephemeral kind cluster per run, so PRs deploy and smoke-test too. With a real shared staging cluster. the deploy would run only on pushes to `main`
 ### Image scan
 
 Every image is scanned with [Trivy](https://trivy.dev/) before it's pushed. The build
