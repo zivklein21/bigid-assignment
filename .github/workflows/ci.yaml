@@ -134,7 +134,7 @@ jobs:
             curl -fs localhost:8080/health > /dev/null && break
             sleep 1
           done
-          bash scripts/smoke-test.sh http://localhost:8080
+          bash scripts/smoke-test.sh http://localhost:9999
 
       - name: Debug on failure
         if: failure()
@@ -142,3 +142,21 @@ jobs:
           kubectl -n staging get pods -o wide
           kubectl -n staging describe pods
           kubectl -n staging logs -l app.kubernetes.io/instance=whoami --tail=100
+
+  notify:
+    needs: [lint, tests, helm-lint, build, deploy-staging]
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    steps:
+      - name: Set commit status
+        env: 
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE: ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && 'failure' || 'success' }}
+        run: |
+          gh api repos/${{ github.repository }}/statuses/${{ gihub.sha }} \
+            -f state="$STATE" \
+            -f context="deploy/staging"
+            -f description="Staging deploy + smoke test: $STATE" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
