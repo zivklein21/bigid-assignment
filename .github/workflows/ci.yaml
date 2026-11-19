@@ -218,8 +218,14 @@ jobs:
 
           cat comment.md >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "${{github.event_name }}" == "pull_request" ]; then
-            gh pr comment "${{ github.event.pull_request.number }}" --repo "$RPEO" --body-file comment.md
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pr="${{ github.event.pull_request.number }}"
+          else
+            pr=$(gh api "repos/$REPO/commits/${{ github.sha }}/pulls" --jq '.[0].number // empty')
+          fi
+
+          if [ -n "$pr" ]; then
+            gh pr comment "$pr" --repo "$REPO" --body-file comment.md
           else
             gh api "repos/$REPO/commits/${{ github.sha }}/comments" -F body=@comment.md
           fi
