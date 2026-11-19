@@ -61,15 +61,22 @@ Both probes send `Cache-Control: no-store`, so no proxy caches a probe result.
 
 ```
 .
-├── app.py                 # Flask app: routes, proxy handling, readiness checks
-├── templates/index.html   # HTML page
-├── static/                # CSS + JS (copy button)
-├── tests/test_app.py      # pytest suite
-├── charts/                # Helm chart for Kubernetes deployment
-├── .github/workflows/     # CI: tests → build image
-├── Dockerfile             # Multi-stage build: uv + PyInstaller → single binary
-├── pyproject.toml         # Dependencies: prod + dev group (uv)
-└── uv.lock                # Locked versions
+├── app.py                        # Flask app: routes, proxy handling, readiness checks
+├── templates/index.html          # HTML page
+├── static/                       # CSS + JS (copy button)
+├── tests/test_app.py             # pytest suite
+├── charts/bigid-assignment/      # Helm chart
+│   ├── values.yaml               #   defaults (probes, resources, security, ...)
+│   ├── values-staging.yaml       #   overrides used by the CI staging deploy
+│   └── values.schema.json        #   validates values on lint/install/upgrade
+├── scripts/
+│   ├── smoke-test.sh             # post-deploy HTTP checks (CI and local)
+│   └── ai_diagnose.py            # LLM diagnosis of failed CI runs
+├── .github/workflows/ci.yaml     # CI: lint → tests → build → scan → push → helm lint → deploy → smoke test
+├── Dockerfile                    # Multi-stage build: uv + PyInstaller → single binary
+├── .dockerignore                 # Keeps .git, .venv, tests, caches out of the build context
+├── pyproject.toml                # Dependencies: prod + dev/build/ci groups (uv)
+└── uv.lock                       # Locked versions
 ```
 
 ## Running locally
@@ -153,12 +160,19 @@ kubectl port-forward svc/whoami-bigid-assignment 8080:80
 curl localhost:8080/
 ```
 
+Run the same smoke tests CI runs (needs `jq`), in a second terminal while the
+port-forward is open:
+
+```bash
+bash scripts/smoke-test.sh http://localhost:8080
+```
+
 See [Deploying with Helm](#deploying-with-helm) for configuration and secrets.
 
 ## Published image
 
-CI builds the image on every pull request and on every push to `main`.
-Only pushes to `main` publish it, to GitHub Container Registry:
+CI builds the image on every pull request and every push to `main`. After it
+passes the [image scan](#image-scan), it's published to GitHub Container Registry:
 
 ```
 ghcr.io/zivklein21/bigid-assignment:<commit-sha>
@@ -178,6 +192,86 @@ docker run --rm -p 8080:8080 ghcr.io/zivklein21/bigid-assignment:<commit-sha>
 
 All published tags are listed on the repository's
 [Packages page](https://github.com/zivklein21/bigid-assignment/pkgs/container/bigid-assignment).
+
+## How CI works
+
+The workflow [`.github/workflows/ci.yaml`](.github/workflows/ci.yaml) runs on every
+pull request and every push to `main`:
+
+```
+lint ──┐
+tests ─┴─► build → scan → push ─┐
+helm-lint ──────────────────────┴─► deploy-staging ─┬─► notify        (always)
+                                    (deploy → smoke) └─► ai-diagnosis (only on failure)
+```
+
+| Job | What it does |
+|---|---|
+| `lint` | `ruff check` and `ruff format --check` |
+| `tests` | `pytest`; any failing test fails the pipeline |
+| `build` | Builds the image, tags it with the commit SHA, [scans it](#image-scan) with Trivy, then pushes it to ghcr.io |
+| `helm-lint` | `helm lint --strict`; values are also validated against [`values.schema.json`](charts/bigid-assignment/values.schema.json) |
+| `deploy-staging` | Deploys the new image with Helm into the `staging` namespace and runs the smoke tests (below) |
+| `notify` | Reports success or failure as a GitHub commit status (below) |
+| `ai-diagnosis` | Runs only when a job fails; posts an AI diagnosis on the PR (below) |
+
+### Staging deploy and smoke tests
+
+`deploy-staging` creates a [kind](https://kind.sigs.k8s.io/) cluster on the runner and runs:
+
+1. **Deploy:** `helm upgrade --install` into the `staging` namespace with
+   [`values-staging.yaml`](charts/bigid-assignment/values-staging.yaml) and
+   `image.tag=<commit-sha>`. `--wait` fails the step if the pods don't become Ready.
+2. **Verify:** checks that the running Deployment uses this commit's image.
+3. **`helm test`:** a pod inside the cluster calls `/health` through the Service.
+4. **Smoke tests:** [`scripts/smoke-test.sh`](scripts/smoke-test.sh) runs against the app
+   through `kubectl port-forward`. It checks `/health` and `/ready` return 200, `/` returns
+   an IP in text, JSON and HTML, and a spoofed `X-Forwarded-For` header is ignored.
+   Any failed check fails the pipeline.
+5. **On failure:** prints pod status, events and app logs to help debugging.
+
+Staging is **ephemeral**: the kind cluster exists only for the length of the job. To
+deploy to a long-lived cluster, replace the kind step with a kubeconfig stored as a
+secret; the Helm commands stay the same.
+
+### Image scan
+
+Every image is scanned with [Trivy](https://trivy.dev/) before it's pushed. The build
+fails on **HIGH** or **CRITICAL** vulnerabilities that have a fix available
+(`ignore-unfixed`), so a vulnerable image is never published. The full scan result is
+also saved as JSON and uploaded as the **`trivy-report`** artifact on every run, on the
+run's summary page.
+
+### Notification
+
+`notify` runs after every pipeline, whether it passed or failed, and sets a GitHub commit
+status named **`deploy/staging`** (success or failure) with a link to the run. It appears
+in the checks list of the commit and of the PR.
+
+### AI failure diagnosis
+
+When any job fails, `ai-diagnosis`:
+
+1. Finds the failed jobs through the GitHub API and downloads their logs (last 300 lines each).
+2. Sends them to Claude using [`scripts/ai_diagnose.py`](scripts/ai_diagnose.py), asking for
+   a short diagnosis: the failing step, the likely root cause and a suggested fix.
+3. Posts the result as a **PR comment** with a link to the run. A failure after merge is
+   posted on the PR that was merged. It's also shown on the run's summary page.
+
+**Example:** in [this run](https://github.com/zivklein21/bigid-assignment/actions/runs/44524195373)
+the smoke test was deliberately pointed at the wrong port. The
+[diagnosis comment](https://github.com/zivklein21/bigid-assignment/pull/24#issuecomment-7009182128)
+identified the failing step, quoted the `curl` error, and suggested the fix.
+
+### Required secrets
+
+| Secret | Used by | Notes |
+|---|---|---|
+| `GITHUB_TOKEN` | build, deploy-staging, notify, ai-diagnosis | Provided automatically by GitHub Actions |
+| `ANTHROPIC_API_KEY` | ai-diagnosis | Repository secret. Without it the diagnosis is skipped |
+
+PRs from forks get a read-only token and no secrets, so they can't push the image or
+run the AI diagnosis.
 
 ## Configuration
 
@@ -239,6 +333,26 @@ startupProbe:
   periodSeconds: 5
   failureThreshold: 24
 ```
+
+### Ingress (optional)
+
+The chart includes an Ingress, disabled by default (`ingress.enabled: false`). It needs an
+ingress controller already running in the cluster; the chart doesn't install one, since a
+controller is shared cluster infrastructure.
+
+```bash
+helm upgrade --install whoami ./charts/bigid-assignment \
+  --set ingress.enabled=true \
+  --set ingress.className=<your-controller-class> \
+  --set config.trustedProxies=1
+```
+
+Behind an ingress controller, set `config.trustedProxies` to the number of proxy hops
+(see [Design decision](#design-decision-identifying-the-client-ip)). For local testing
+with kind, follow the [kind Ingress guide](https://kind.sigs.k8s.io/docs/user/ingress/)
+to create the cluster with port mappings and install a controller.
+
+CI doesn't use the Ingress: the smoke tests reach the app through `kubectl port-forward`.
 
 ### Security defaults
 
