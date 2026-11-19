@@ -30,6 +30,8 @@ jobs:
   build:
     needs: [lint, tests]
     runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.vars.outputs.sha }}
     permissions:
       contents: read
       packages: write
@@ -81,3 +83,36 @@ jobs:
       - uses: azure/setup-helm@v4
       - name: Helm lint
         run: helm lint --strict charts/bigid-assignment
+
+  deploy-staging:
+    needs: [build, helm-lint]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+
+      - uses: azure/setup-helm@v4
+
+      - name: Create ns and image pull secret
+        run: |
+          kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n staging create secret docker-registry ghcr-pull \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \   
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Helm deploy
+        run: |
+          helm upgrade --install whoami charts/bigid-assignment \
+            --namespace staging \
+            -f charts/bigid-assignment/values-staging.yaml \
+            --set-string image.tag=${{ needs.builds.outputs.sha }} \
+            --wait --timeout 3m
