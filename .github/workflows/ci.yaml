@@ -114,7 +114,7 @@ jobs:
           helm upgrade --install whoami charts/bigid-assignment \
             --namespace staging \
             -f charts/bigid-assignment/values-staging.yaml \
-            --set-string image.tag=${{ needs.buildאיק.outputs.sha }} \
+            --set-string image.tag=${{ needs.build.outputs.sha }} \
             --wait --timeout 3m
 
       - name: Curl the app
