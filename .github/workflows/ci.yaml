@@ -129,10 +129,16 @@ jobs:
 
       - name: Smoke test
         run: |
-          kubectl -n staging port-forward scv/whoami-bigid-assignment 8080:80 > /dev/null 2>&1 &
+          kubectl -n staging port-forward svc/whoami-bigid-assignment 8080:80 > /dev/null 2>&1 &
           for i in $(seq 1 20); do
             curl -fs localhost:8080/health > /dev/null && break
             sleep 1
           done
           bash scripts/smoke-test.sh http://localhost:8080
 
+      - name: Debug on failure
+        if: failure()
+        run: |
+          kubectl -n staging get pods -o wide
+          kubectl -n staging describe pods
+          kubectl -n staging logs -l app.kubernetes.io/instance=whoami --tail=100
