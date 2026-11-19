@@ -196,7 +196,7 @@ jobs:
           if [ -z "$ANTHROPIC_API_KEY" ]; then
             echo "No ANTHROPIC_API_KEY available; skipping" > diagnosis.md
           else
-            uv run --no-project --with anthropic python scripts/ai_diagnosis.py failed.log > diagnosis.md
+            uv run --no-project --with anthropic python scripts/ai_diagnose.py failed.log > diagnosis.md
           fi
           cat diagnosis.md
 
