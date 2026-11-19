@@ -114,5 +114,5 @@ jobs:
           helm upgrade --install whoami charts/bigid-assignment \
             --namespace staging \
             -f charts/bigid-assignment/values-staging.yaml \
-            --set-string image.tag=${{ needs.builds.outputs.sha }} \
+            --set-string image.tag=${{ needs.build.outputs.sha }} \
             --wait --timeout 3m
