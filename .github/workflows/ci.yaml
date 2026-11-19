@@ -155,7 +155,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STATE: ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && 'failure' || 'success' }}
         run: |
-          gh api repos/${{ github.repository }}/statuses/${{ gihub.sha }} \
+          gh api repos/${{ github.repository }}/statuses/${{ github.sha }} \
             -f state="$STATE" \
             -f context="deploy/staging"
             -f description="Staging deploy + smoke test: $STATE" \
